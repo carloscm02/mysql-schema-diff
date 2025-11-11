@@ -57,7 +57,12 @@ Antes de ejecutar el script, es necesario configurar las conexiones a las bases 
 
 ### Crear archivo `.env`
 
-Crea un archivo `.env` en la raíz del proyecto con el siguiente formato:
+1. Copia el archivo de ejemplo:
+```bash
+cp .env.example .env
+```
+
+2. Edita el archivo `.env` con tus credenciales reales. El formato es el siguiente:
 
 ```env
 # Configuración de conexión a Base de Datos 1
@@ -92,7 +97,9 @@ DB2_NAME=nombre_base_datos_2
 
 ### Notas de seguridad
 
-⚠️ **IMPORTANTE**: El archivo `.env` está incluido en `.gitignore` para proteger tus credenciales. **Nunca** subas este archivo al repositorio.
+⚠️ **IMPORTANTE**: 
+- El archivo `.env` está incluido en `.gitignore` para proteger tus credenciales. **Nunca** subas este archivo al repositorio.
+- El archivo `.env.example` contiene la estructura básica sin credenciales reales y puede ser compartido de forma segura.
 
 ## 💻 Uso
 
