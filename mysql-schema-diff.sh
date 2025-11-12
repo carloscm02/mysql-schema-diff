@@ -24,12 +24,20 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No color
 
 REQUIRED_VARS=(DB1_HOST DB1_PORT DB1_USER DB1_PASS DB1_NAME DB2_HOST DB2_PORT DB2_USER DB2_PASS DB2_NAME)
+missing_vars=()
 for var in "${REQUIRED_VARS[@]}"; do
     if [ -z "${!var}" ]; then
-        echo -e "${RED}❌ Error${NC}: la variable ${YELLOW}$var${NC} no está definida.${NC}"
-        exit 1
+        missing_vars+=("$var")
     fi
 done
+
+if [ ${#missing_vars[@]} -ne 0 ]; then
+    echo -e "${RED}❌ Error${NC}: Las siguientes variables requeridas no están definidas:"
+    for var in "${missing_vars[@]}"; do
+        echo -e "   ${YELLOW}$var${NC}"
+    done
+    exit 1
+fi
 
 echo "🚀 Generando archivos de estructura (schema) por tabla para comparación..."
 echo -e "📊 Base de datos 1: ${YELLOW}$DB1_NAME${NC} en ${YELLOW}$DB1_HOST${NC}:${YELLOW}$DB1_PORT${NC}"
