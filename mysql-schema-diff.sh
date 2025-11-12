@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# Cargar variables de entorno desde .env
-if [ -f .env ]; then
+# Determinar qué archivo .env usar
+# Si se pasa un segundo parámetro, usar ese archivo
+# Si no, usar .env por defecto
+ENV_FILE="${2:-.env}"
+
+# Cargar variables de entorno desde el archivo .env especificado
+if [ -f "$ENV_FILE" ]; then
+    echo "📄 Cargando variables desde: $ENV_FILE"
     # Cargar variables desde .env, ignorando comentarios y líneas vacías
     while IFS= read -r line || [ -n "$line" ]; do
         # Ignorar comentarios y líneas vacías
@@ -10,10 +16,11 @@ if [ -f .env ]; then
         fi
         # Exportar la variable
         export "$line"
-    done < .env
+    done < "$ENV_FILE"
 else
-    echo "❌ Error: No se encontró el archivo .env"
+    echo "❌ Error: No se encontró el archivo $ENV_FILE"
     echo "   Por favor, crea un archivo .env con las variables de conexión a las bases de datos"
+    echo "   O especifica un archivo .env como segundo parámetro: $0 [parametro1] archivo.env"
     exit 1
 fi
 

@@ -109,6 +109,14 @@ Ejecuta el script desde la raíz del proyecto:
 ./mysql-schema-diff.sh
 ```
 
+O especifica un archivo `.env` personalizado como segundo parámetro:
+
+```bash
+./mysql-schema-diff.sh [parametro1] .bbdd_empresa1.env
+```
+
+**Nota**: Si no se especifica un segundo parámetro, el script usará el archivo `.env` por defecto.
+
 El script te pedirá confirmación antes de comenzar la comparación:
 
 ```
@@ -123,7 +131,7 @@ El script realiza las siguientes operaciones:
 
 ### 1. Carga de configuración
 
-- Lee el archivo `.env` y carga las variables de entorno
+- Lee el archivo `.env` (o el archivo especificado como segundo parámetro) y carga las variables de entorno
 - Valida que todas las variables requeridas estén definidas
 - Muestra información de las bases de datos que se van a comparar
 
@@ -247,7 +255,7 @@ El archivo SQL correspondiente se guardará en `output/` para su revisión.
 
 ### Error: "No se encontró el archivo .env"
 
-Asegúrate de que el archivo `.env` existe en la raíz del proyecto y contiene todas las variables requeridas.
+Asegúrate de que el archivo `.env` (o el archivo especificado como segundo parámetro) existe en la raíz del proyecto y contiene todas las variables requeridas.
 
 ### Error: "la variable XXX no está definida"
 
