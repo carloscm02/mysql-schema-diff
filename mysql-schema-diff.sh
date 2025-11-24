@@ -1,28 +1,122 @@
 #!/bin/bash
 
-# Determinar qué archivo .env usar
-# Si se pasa un segundo parámetro, usar ese archivo
-# Si no, usar .env por defecto
-ENV_FILE="${2:-.env}"
+# Variable global para almacenar archivos temporales que necesitan limpieza
+declare -a TEMP_FILES=()
 
-# Cargar variables de entorno desde el archivo .env especificado
-if [ -f "$ENV_FILE" ]; then
-    echo "📄 Cargando variables desde: $ENV_FILE"
-    # Cargar variables desde .env, ignorando comentarios y líneas vacías
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Ignorar comentarios y líneas vacías
-        if [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
-            continue
+# Función de limpieza para ejecutar al salir o interrumpir
+cleanup_on_exit() {
+    # Limpiar archivos temporales de credenciales
+    for temp_file in "${TEMP_FILES[@]}"; do
+        if [ -n "$temp_file" ] && [ -f "$temp_file" ]; then
+            if command -v shred >/dev/null 2>&1; then
+                shred -u "$temp_file" 2>/dev/null || rm -f "$temp_file"
+            else
+                # Si shred no está disponible, sobrescribir y eliminar
+                echo "" > "$temp_file"
+                rm -f "$temp_file"
+            fi
         fi
-        # Exportar la variable
-        export "$line"
-    done < "$ENV_FILE"
-else
-    echo "❌ Error: No se encontró el archivo $ENV_FILE"
-    echo "   Por favor, crea un archivo .env con las variables de conexión a las bases de datos"
-    echo "   O especifica un archivo .env como segundo parámetro: $0 [parametro1] archivo.env"
+    done
+    # Limpiar variables sensibles
+    unset DB1_PASS DB2_PASS env_vars
+    TEMP_FILES=()
+}
+
+# Configurar trap para limpiar en caso de salida normal, interrupción o terminación
+trap cleanup_on_exit EXIT INT TERM
+
+# Verificar que el script no se ejecute como root
+if [ "$EUID" -eq 0 ]; then
+    echo "⚠️  Advertencia: No se recomienda ejecutar este script como root"
+    echo "   Ejecutar como root puede ser un riesgo de seguridad"
+    read -p "¿Continuar de todos modos? (s/n): " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        exit 1
+    fi
+fi
+
+# Verificar que se haya pasado el archivo .env como parámetro
+if [ -z "$1" ]; then
+    echo "❌ Error: No se ha especificado el archivo .env"
+    echo "   Uso: $0 <archivo.env>"
+    echo "   Ejemplo: $0 .ejemplo.env"
     exit 1
 fi
+
+ENV_FILE="$1"
+
+# Validar que no contenga path traversal (../ o rutas absolutas peligrosas)
+if [[ "$ENV_FILE" =~ \.\./ ]] || [[ "$ENV_FILE" =~ ^/ ]]; then
+    echo "❌ Error: El archivo .env debe estar en el directorio actual o subdirectorios"
+    echo "[por medidas de seguridad] NO se permiten rutas absolutas o path traversal (../)"
+    exit 1
+fi
+
+# Convertir a ruta absoluta y validar
+ENV_FILE=$(realpath "$ENV_FILE" 2>/dev/null || echo "$ENV_FILE")
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+
+# Verificar que el archivo termine en .env por cuestiones de seguridad
+if [[ ! "$ENV_FILE" =~ \.env$ ]]; then
+    echo "❌ Error: El archivo debe terminar en .env por cuestiones de seguridad"
+    echo "   Los archivos .env son ignorados por git para proteger información sensible"
+    echo "   Uso: $0 <archivo.env>"
+    echo "   Ejemplo: $0 .ejemplo.env"
+    exit 1
+fi
+
+# Verificar que el archivo existe
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Error: No se encontró el archivo $ENV_FILE"
+    echo "   Por favor, verifica que el archivo existe y la ruta es correcta"
+    exit 1
+fi
+
+# Verificar permisos del archivo (debe ser 600 o más restrictivo)
+FILE_PERMS=$(stat -c "%a" "$ENV_FILE" 2>/dev/null || stat -f "%OLp" "$ENV_FILE" 2>/dev/null)
+if [ -n "$FILE_PERMS" ] && [ "$FILE_PERMS" -gt 600 ]; then
+    echo "⚠️  Advertencia: El archivo $ENV_FILE tiene permisos $FILE_PERMS"
+    echo "   Se recomienda usar permisos 600 (chmod 600 $ENV_FILE) para mayor seguridad"
+    read -p "¿Continuar de todos modos? (s/n): " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        exit 1
+    fi
+fi
+
+# Función para validar formato de variable
+validate_env_line() {
+    local line="$1"
+    # Debe tener formato VARIABLE=valor (sin espacios alrededor del =)
+    if [[ "$line" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=.*$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Cargar variables de entorno desde el archivo .env especificado
+echo "📄 Cargando variables desde: $ENV_FILE"
+declare -A env_vars
+while IFS= read -r line || [ -n "$line" ]; do
+    # Ignorar comentarios y líneas vacías
+    if [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+        continue
+    fi
+    # Validar formato antes de procesar
+    if ! validate_env_line "$line"; then
+        echo "⚠️  Advertencia: Línea con formato inválido ignorada: ${line:0:50}..."
+        continue
+    fi
+    # Extraer nombre de variable y valor de forma segura
+    var_name="${line%%=*}"
+    var_name="${var_name// /}"  # Eliminar espacios
+    var_value="${line#*=}"
+    env_vars["$var_name"]="$var_value"
+done < "$ENV_FILE"
+
+# Exportar variables validadas
+for var_name in "${!env_vars[@]}"; do
+    export "$var_name=${env_vars[$var_name]}"
+done
 
 # Colores para el output
 GREEN='\033[0;32m'
@@ -67,7 +161,7 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 
-# Función para obtener lista de tablas
+# Función para obtener lista de tablas (sin exponer contraseña)
 get_tables() {
     local host=$1
     local port=$2
@@ -75,14 +169,34 @@ get_tables() {
     local pass=$4
     local db=$5
     
-    if [ -n "$port" ]; then
-        mysql -h "$host" -P "$port" -u "$user" --password="$pass" "$db" -se "SHOW TABLES;" 2>/dev/null
+    # Crear archivo temporal de credenciales
+    local temp_cnf=$(mktemp)
+    chmod 600 "$temp_cnf"
+    cat > "$temp_cnf" << EOF
+[client]
+host=$host
+port=${port:-3306}
+user=$user
+password=$pass
+EOF
+    
+    # Usar archivo de configuración en lugar de --password
+    mysql --defaults-file="$temp_cnf" "$db" -se "SHOW TABLES;" 2>/dev/null
+    local result=$?
+    
+    # Limpiar archivo temporal de forma segura
+    if command -v shred >/dev/null 2>&1; then
+        shred -u "$temp_cnf" 2>/dev/null || rm -f "$temp_cnf"
     else
-        mysql -h "$host" -P "$port" -u "$user" --password="$pass" "$db" -se "SHOW TABLES;" 2>/dev/null
+        # Si shred no está disponible, sobrescribir y eliminar
+        echo "" > "$temp_cnf"
+        rm -f "$temp_cnf"
     fi
+    
+    return $result
 }
 
-# Función para exportar estructura de tabla
+# Función para exportar estructura de tabla (sin exponer contraseña)
 export_table_schema() {
     local host=$1
     local port=$2
@@ -92,17 +206,35 @@ export_table_schema() {
     local table=$6
     local output_file=$7
     
-    if [ -n "$port" ]; then
-        mysqldump -h "$host" -P "$port" -u "$user" --password="$pass" \
-            --no-data "$db" "$table" | \
-            grep -v '^--' | grep -Ev '^/\*!' | \
-            sed 's/ AUTO_INCREMENT=[0-9]*//g' | sed 's/DEFINER=`[^`]*`@`[^`]*`//g' > "$output_file" 2>/dev/null
+    # Crear archivo temporal de credenciales
+    local temp_cnf=$(mktemp)
+    chmod 600 "$temp_cnf"
+    cat > "$temp_cnf" << EOF
+[client]
+host=$host
+port=${port:-3306}
+user=$user
+password=$pass
+EOF
+    
+    # Usar archivo de configuración en lugar de --password
+    mysqldump --defaults-file="$temp_cnf" --no-data "$db" "$table" 2>/dev/null | \
+        grep -v '^--' | grep -Ev '^/\*!' | \
+        sed 's/ AUTO_INCREMENT=[0-9]*//g' | \
+        sed 's/DEFINER=`[^`]*`@`[^`]*`//g' > "$output_file"
+    
+    local result=$?
+    
+    # Limpiar archivo temporal de forma segura
+    if command -v shred >/dev/null 2>&1; then
+        shred -u "$temp_cnf" 2>/dev/null || rm -f "$temp_cnf"
     else
-        mysqldump -h "$host" -u "$user" --password="$pass" \
-            --no-data "$db" "$table" | \
-            grep -v '^--' | grep -Ev '^/\*!' | \
-            sed 's/ AUTO_INCREMENT=[0-9]*//g' | sed 's/DEFINER=`[^`]*`@`[^`]*`//g' > "$output_file" 2>/dev/null
+        # Si shred no está disponible, sobrescribir y eliminar
+        echo "" > "$temp_cnf"
+        rm -f "$temp_cnf"
     fi
+    
+    return $result
 }
 
 echo "📋 Obteniendo lista de tablas..."
@@ -250,4 +382,4 @@ NOTAS:
 EOF
     
     echo "📄 Resumen guardado en: $RESUMEN_FILE"
-fi 
+fi

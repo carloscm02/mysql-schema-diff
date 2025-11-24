@@ -53,13 +53,13 @@ chmod +x mysql-schema-diff.sh
 
 ## ⚙️ Configuración
 
-Antes de ejecutar el script, es necesario configurar las conexiones a las bases de datos en el archivo `.env`.
+Antes de ejecutar el script, es necesario crear un archivo de configuración con extensión `.env` que contenga las conexiones a las bases de datos.
 
 ### Crear archivo `.env`
 
-1. Copia el archivo de ejemplo:
+1. Crea un archivo con extensión `.env` (por ejemplo: `.ejemplo.env`, `.produccion.env`, `.desarrollo.env`):
 ```bash
-cp .env.example .env
+touch .ejemplo.env
 ```
 
 2. Edita el archivo `.env` con tus credenciales reales. El formato es el siguiente:
@@ -98,24 +98,41 @@ DB2_NAME=nombre_base_datos_2
 ### Notas de seguridad
 
 ⚠️ **IMPORTANTE**: 
-- El archivo `.env` está incluido en `.gitignore` para proteger tus credenciales. **Nunca** subas este archivo al repositorio.
-- El archivo `.env.example` contiene la estructura básica sin credenciales reales y puede ser compartido de forma segura.
+- **El archivo DEBE terminar en `.env`** por cuestiones de seguridad. El script validará esto antes de ejecutarse.
+- Los archivos que terminan en `.env` están incluidos en `.gitignore` para proteger tus credenciales. **Nunca** subas estos archivos al repositorio.
+- Puedes crear múltiples archivos `.env` para diferentes entornos (por ejemplo: `.desarrollo.env`, `.produccion.env`, `.ejemplo.env`).
+- **Se recomienda usar permisos restrictivos** en los archivos `.env`:
+  ```bash
+  chmod 600 .ejemplo.env
+  ```
+- El script utiliza archivos temporales seguros para las credenciales, evitando que las contraseñas aparezcan en la lista de procesos del sistema.
+- Las contraseñas se limpian automáticamente de la memoria al finalizar la ejecución.
 
 ## 💻 Uso
 
-Ejecuta el script desde la raíz del proyecto:
+Ejecuta el script desde la raíz del proyecto pasando el archivo `.env` como parámetro obligatorio:
 
 ```bash
-./mysql-schema-diff.sh
+./mysql-schema-diff.sh <archivo.env>
 ```
 
-O especifica un archivo `.env` personalizado como segundo parámetro:
+**Ejemplos:**
 
 ```bash
-./mysql-schema-diff.sh [parametro1] .bbdd_empresa1.env
+# Usar un archivo de configuración específico
+./mysql-schema-diff.sh .ejemplo.env
+
+# Usar otro archivo de configuración
+./mysql-schema-diff.sh .produccion.env
+
+# Usar un archivo con nombre descriptivo
+./mysql-schema-diff.sh .servidor_carlos.env
 ```
 
-**Nota**: Si no se especifica un segundo parámetro, el script usará el archivo `.env` por defecto.
+⚠️ **Requisitos**:
+- El archivo `.env` es **obligatorio** como parámetro
+- El archivo **debe terminar en `.env`** por cuestiones de seguridad
+- El archivo debe existir en la ruta especificada
 
 El script te pedirá confirmación antes de comenzar la comparación:
 
@@ -131,7 +148,10 @@ El script realiza las siguientes operaciones:
 
 ### 1. Carga de configuración
 
-- Lee el archivo `.env` (o el archivo especificado como segundo parámetro) y carga las variables de entorno
+- Valida que se haya pasado el archivo `.env` como parámetro
+- Verifica que el archivo termine en `.env` por cuestiones de seguridad
+- Verifica que el archivo exista
+- Lee el archivo `.env` especificado y carga las variables de entorno
 - Valida que todas las variables requeridas estén definidas
 - Muestra información de las bases de datos que se van a comparar
 
@@ -204,8 +224,9 @@ output/
 ### Ejemplo 1: Comparación básica
 
 ```bash
-$ ./mysql-schema-diff.sh
+$ ./mysql-schema-diff.sh .ejemplo.env
 
+📄 Cargando variables desde: .ejemplo.env
 🚀 Generando archivos de estructura (schema) por tabla para comparación...
 📊 Base de datos 1: desarrollo en 127.0.0.1:3306
 📊 Base de datos 2: produccion en 192.168.1.100:3306
@@ -253,9 +274,20 @@ El archivo SQL correspondiente se guardará en `output/` para su revisión.
 
 ## 🛠️ Solución de problemas
 
+### Error: "No se ha especificado el archivo .env"
+
+Debes pasar el archivo `.env` como parámetro obligatorio. Ejemplo:
+```bash
+./mysql-schema-diff.sh .ejemplo.env
+```
+
+### Error: "El archivo debe terminar en .env por cuestiones de seguridad"
+
+El archivo que pases como parámetro debe terminar en `.env`. Esto es una medida de seguridad para asegurar que los archivos de configuración sean ignorados por git. Ejemplo válido: `.ejemplo.env`, `.produccion.env`
+
 ### Error: "No se encontró el archivo .env"
 
-Asegúrate de que el archivo `.env` (o el archivo especificado como segundo parámetro) existe en la raíz del proyecto y contiene todas las variables requeridas.
+Asegúrate de que el archivo `.env` especificado existe en la ruta indicada y contiene todas las variables requeridas. Verifica la ruta relativa o absoluta del archivo.
 
 ### Error: "la variable XXX no está definida"
 
@@ -277,6 +309,31 @@ Si todas las estructuras son idénticas, el directorio `output/` se elimina auto
 - Los valores de `AUTO_INCREMENT` se normalizan para evitar falsas diferencias
 - Las referencias a `DEFINER` se eliminan para comparaciones más limpias
 - El script requiere permisos de lectura en ambas bases de datos
+
+## 🔒 Seguridad
+
+Este script implementa varias medidas de seguridad:
+
+- ✅ **Validación de path traversal**: Previene el acceso a archivos fuera del directorio del proyecto mediante validación de rutas
+- ✅ **Validación de extensión `.env`**: Requiere que el archivo de configuración termine en `.env` para asegurar que sea ignorado por git
+- ✅ **Validación de permisos**: Advierte si el archivo `.env` tiene permisos demasiado permisivos (mayores a 600)
+- ✅ **Validación de formato**: Verifica que las variables en el archivo `.env` tengan el formato correcto (`VARIABLE=valor`) antes de exportarlas
+- ✅ **Credenciales seguras**: Utiliza archivos temporales con permisos restrictivos (600) en lugar de pasar contraseñas por línea de comandos, evitando que aparezcan en la lista de procesos
+- ✅ **Limpieza automática**: Elimina archivos temporales de forma segura (usando `shred` si está disponible, o sobrescritura y eliminación)
+- ✅ **Limpieza de memoria**: Elimina variables sensibles (`DB1_PASS`, `DB2_PASS`) de la memoria al finalizar la ejecución
+- ✅ **Protección contra interrupciones**: Utiliza `trap` para garantizar la limpieza de archivos temporales incluso si el script se interrumpe (Ctrl+C) o termina inesperadamente
+- ✅ **Timeout en conexiones**: Implementa timeout de 10 segundos en conexiones MySQL (`--connect-timeout=10`) para evitar que el script se quede colgado indefinidamente
+- ✅ **Validación de ejecución como root**: Advierte y solicita confirmación si el script se ejecuta como usuario root para minimizar riesgos de seguridad
+
+### Recomendaciones de seguridad
+
+1. **Permisos del archivo `.env`**: Siempre usa `chmod 600` en tus archivos `.env` para restringir el acceso solo al propietario
+2. **No compartir credenciales**: Nunca compartas archivos `.env` con credenciales reales, ni los subas a repositorios públicos
+3. **Rotación de contraseñas**: Cambia las contraseñas de las bases de datos regularmente
+4. **Usuarios con permisos mínimos**: Usa usuarios de base de datos con solo los permisos necesarios (lectura para este script)
+5. **Revisar logs**: Revisa periódicamente los logs de acceso a las bases de datos para detectar accesos no autorizados
+6. **No ejecutar como root**: Ejecuta el script con un usuario no privilegiado para minimizar riesgos en caso de compromiso
+7. **Manejo de interrupciones**: Si interrumpes el script (Ctrl+C), los archivos temporales con credenciales se limpiarán automáticamente gracias al sistema de `trap`
 
 ## 📄 Licencia
 
