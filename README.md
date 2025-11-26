@@ -5,6 +5,7 @@ Herramienta en Bash para comparar la estructura de dos bases de datos MySQL tabl
 ## 📋 Tabla de Contenidos
 
 - [Características](#-características)
+- [Normas de Estilo](#-normas-de-estilo)
 - [Requisitos](#-requisitos)
 - [Instalación](#-instalación)
 - [Configuración](#-configuración)
@@ -12,6 +13,9 @@ Herramienta en Bash para comparar la estructura de dos bases de datos MySQL tabl
 - [Funcionamiento](#-funcionamiento)
 - [Salida](#-salida)
 - [Ejemplos](#-ejemplos)
+- [Solución de problemas](#-solución-de-problemas)
+- [Seguridad](#-seguridad)
+- [Contribuir](#-contribuir)
 
 ## ✨ Características
 
@@ -22,6 +26,74 @@ Herramienta en Bash para comparar la estructura de dos bases de datos MySQL tabl
 - 🎨 Interfaz de línea de comandos con colores y emojis
 - ✅ Validación de variables de entorno requeridas
 - 🔒 Configuración segura mediante archivo `.env`
+
+## 🎨 Normas de Estilo
+
+Este proyecto sigue un conjunto de normas de estilo para mantener la consistencia en el código y la presentación del output. **Es fundamental que cualquier persona que desee contribuir al proyecto lea y aplique estas normas.**
+
+### Sistema de Colores
+
+El script utiliza un sistema de colores estandarizado para facilitar la lectura e interpretación de la información mostrada en la consola. Cada color tiene un propósito específico y debe usarse de forma consistente:
+
+#### 🟢 Verde subrayado
+**Uso exclusivo**: Comandos y rutas de archivos.
+
+Facilita la identificación de instrucciones que el usuario puede copiar y ejecutar directamente.
+
+**Ejemplos:**
+- `chmod 600 .ejemplo.env`
+- `./output/mi_bd_usuarios_schema.sql`
+- `diff output/desarrollo_productos_schema.sql output/produccion_productos_schema.sql`
+
+#### 🔴 Rojo
+**Uso exclusivo**: Errores y situaciones críticas.
+
+Su uso es limitado intencionalmente para que destaque cuando aparece. Solo debe utilizarse para mensajes de error o situaciones que requieren atención inmediata.
+
+**Ejemplos:**
+- `❌ Error: No se ha especificado el archivo .env`
+- `❌ Error: No se pudo conectar a la base de datos`
+- Valores problemáticos en advertencias (ej: permisos incorrectos)
+
+#### 🟡 Amarillo (negrita)
+**Uso**: Advertencias y parámetros importantes.
+
+Se utiliza para destacar valores, parámetros o información que requiere atención del usuario, pero que no son críticos.
+
+**Ejemplos:**
+- `⚠️ Advertencia: El archivo tiene permisos 644`
+- `Base de datos 1: mi_bd en 127.0.0.1:3306` (destacando nombres y valores)
+- Variables de entorno o parámetros de configuración
+
+#### 🔵 Azul
+**Uso**: Títulos y encabezados de secciones.
+
+Se utiliza para títulos de secciones, encabezados de resúmenes y etiquetas de información estructurada.
+
+**Ejemplos:**
+- `RESUMEN DE COMPARACIÓN ESTRUCTURAL:`
+- `INFORMACIÓN DE CONEXIÓN:`
+- Etiquetas de secciones en el output
+
+### Ejemplo de uso combinado
+
+```bash
+⚠️  Advertencia: El archivo .ejemplo.env tiene permisos 644
+   Se recomienda usar permisos 600 (chmod 600 .ejemplo.env) para mayor seguridad
+```
+
+**Desglose del ejemplo:**
+- El emoji ⚠️ indica que es una advertencia
+- El texto "Advertencia" está en amarillo para destacar
+- El valor "644" está en rojo para indicar que es un problema
+- El comando `chmod 600 .ejemplo.env` está en verde subrayado para facilitar su copia
+
+### Principios de diseño
+
+1. **Consistencia**: Los colores deben usarse de forma consistente en todo el proyecto
+2. **Moderación**: El uso de colores debe ser moderado para evitar sobrecargar el output
+3. **Accesibilidad**: Los colores complementan pero no reemplazan el contenido textual
+4. **Propósito claro**: Cada color tiene un propósito específico y no debe usarse para otros fines
 
 ## 📦 Requisitos
 
@@ -95,18 +167,7 @@ DB2_NAME=nombre_base_datos_2
 | `DB2_PASS` | Contraseña de la segunda base de datos | `otra_contraseña` |
 | `DB2_NAME` | Nombre de la segunda base de datos | `base_datos_remota` |
 
-### Notas de seguridad
-
-⚠️ **IMPORTANTE**: 
-- **El archivo DEBE terminar en `.env`** por cuestiones de seguridad. El script validará esto antes de ejecutarse.
-- Los archivos que terminan en `.env` están incluidos en `.gitignore` para proteger tus credenciales. **Nunca** subas estos archivos al repositorio.
-- Puedes crear múltiples archivos `.env` para diferentes entornos (por ejemplo: `.desarrollo.env`, `.produccion.env`, `.ejemplo.env`).
-- **Se recomienda usar permisos restrictivos** en los archivos `.env`:
-  ```bash
-  chmod 600 .ejemplo.env
-  ```
-- El script utiliza archivos temporales seguros para las credenciales, evitando que las contraseñas aparezcan en la lista de procesos del sistema.
-- Las contraseñas se limpian automáticamente de la memoria al finalizar la ejecución.
+> ⚠️ **IMPORTANTE**: Para información detallada sobre seguridad y mejores prácticas, consulta la sección [Seguridad](#-seguridad).
 
 ## 💻 Uso
 
@@ -312,7 +373,11 @@ Si todas las estructuras son idénticas, el directorio `output/` se elimina auto
 
 ## 🔒 Seguridad
 
-Este script implementa varias medidas de seguridad:
+La seguridad es una prioridad fundamental en este proyecto. Este script implementa múltiples capas de protección para garantizar el manejo seguro de credenciales y datos sensibles.
+
+### Medidas de seguridad implementadas
+
+Este script implementa las siguientes medidas de seguridad:
 
 - ✅ **Validación de path traversal**: Previene el acceso a archivos fuera del directorio del proyecto mediante validación de rutas
 - ✅ **Validación de extensión `.env`**: Requiere que el archivo de configuración termine en `.env` para asegurar que sea ignorado por git
@@ -325,6 +390,17 @@ Este script implementa varias medidas de seguridad:
 - ✅ **Timeout en conexiones**: Implementa timeout de 10 segundos en conexiones MySQL (`--connect-timeout=10`) para evitar que el script se quede colgado indefinidamente
 - ✅ **Validación de ejecución como root**: Advierte y solicita confirmación si el script se ejecuta como usuario root para minimizar riesgos de seguridad
 
+### Configuración segura de archivos `.env`
+
+⚠️ **IMPORTANTE**: 
+- **El archivo DEBE terminar en `.env`** por cuestiones de seguridad. El script validará esto antes de ejecutarse.
+- Los archivos que terminan en `.env` están incluidos en `.gitignore` para proteger tus credenciales. **Nunca** subas estos archivos al repositorio.
+- Puedes crear múltiples archivos `.env` para diferentes entornos (por ejemplo: `.desarrollo.env`, `.produccion.env`, `.ejemplo.env`).
+- **Se recomienda usar permisos restrictivos** en los archivos `.env`:
+  ```bash
+  chmod 600 .ejemplo.env
+  ```
+
 ### Recomendaciones de seguridad
 
 1. **Permisos del archivo `.env`**: Siempre usa `chmod 600` en tus archivos `.env` para restringir el acceso solo al propietario
@@ -335,9 +411,27 @@ Este script implementa varias medidas de seguridad:
 6. **No ejecutar como root**: Ejecuta el script con un usuario no privilegiado para minimizar riesgos en caso de compromiso
 7. **Manejo de interrupciones**: Si interrumpes el script (Ctrl+C), los archivos temporales con credenciales se limpiarán automáticamente gracias al sistema de `trap`
 
-## 📄 Licencia
+## 🤝 Contribuir
 
-Este proyecto está disponible bajo la licencia que especifiques en tu repositorio.
+Este proyecto está abierto a contribuciones. Si deseas participar en el desarrollo o mejorar el código, es **imprescindible** que:
+
+1. **Leas y comprendas las [Normas de Estilo](#-normas-de-estilo)** antes de realizar cualquier modificación
+2. Mantengas la consistencia en el uso de colores, emojis y formato del output
+3. Respetes las medidas de seguridad implementadas
+4. Documentes cualquier cambio significativo
+5. Pruebes tus cambios antes de proponerlos
+
+Las normas de estilo no son opcionales: son fundamentales para mantener la calidad, consistencia y seguridad del proyecto. Cualquier contribución que no siga estas normas será rechazada hasta que se ajuste a los estándares establecidos.
+
+### Cómo contribuir
+
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Asegúrate de seguir las [Normas de Estilo](#-normas-de-estilo)
+4. Realiza tus cambios y prueba exhaustivamente
+5. Commit tus cambios (`git commit -m 'Agrega nueva funcionalidad'`)
+6. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+7. Abre un Pull Request
 
 ---
 

@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Colores para el output
+GREEN='\033[4;32m' # Verde subrayado
+RED='\033[0;31m' # Rojo
+YELLOW='\033[1;33m' # Amarillo negrita
+BLUE='\033[0;34m' # Azul
+NC='\033[0m' # Sin color
+
 # Variable global para almacenar archivos temporales que necesitan limpieza
 declare -a TEMP_FILES=()
 
@@ -37,9 +44,9 @@ fi
 
 # Verificar que se haya pasado el archivo .env como parámetro
 if [ -z "$1" ]; then
-    echo "❌ Error: No se ha especificado el archivo .env"
-    echo "   Uso: $0 <archivo.env>"
-    echo "   Ejemplo: $0 .ejemplo.env"
+    echo -e "${RED}❌ Error${NC}: No se ha especificado el archivo .env"
+    echo -e "   ${BLUE}Uso:${NC} ${GREEN}$0 <archivo.env>${NC}"
+    echo -e "   ${BLUE}Ejemplo:${NC} ${GREEN}$0 .ejemplo.env${NC}"
     exit 1
 fi
 
@@ -47,7 +54,7 @@ ENV_FILE="$1"
 
 # Validar que no contenga path traversal (../ o rutas absolutas peligrosas)
 if [[ "$ENV_FILE" =~ \.\./ ]] || [[ "$ENV_FILE" =~ ^/ ]]; then
-    echo "❌ Error: El archivo .env debe estar en el directorio actual o subdirectorios"
+    echo -e "${RED}❌ Error${NC}: El archivo .env debe estar en el directorio actual o subdirectorios"
     echo "[por medidas de seguridad] NO se permiten rutas absolutas o path traversal (../)"
     exit 1
 fi
@@ -58,16 +65,16 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # Verificar que el archivo termine en .env por cuestiones de seguridad
 if [[ ! "$ENV_FILE" =~ \.env$ ]]; then
-    echo "❌ Error: El archivo debe terminar en .env por cuestiones de seguridad"
+    echo -e "${RED}❌ Error${NC}: El archivo debe terminar en .env por cuestiones de seguridad"
     echo "   Los archivos .env son ignorados por git para proteger información sensible"
-    echo "   Uso: $0 <archivo.env>"
-    echo "   Ejemplo: $0 .ejemplo.env"
+    echo -e "   ${BLUE}Uso:${NC} ${GREEN}$0 <archivo.env>${NC}"
+    echo -e "   ${BLUE}Ejemplo:${NC} ${GREEN}$0 .ejemplo.env${NC}"
     exit 1
 fi
 
 # Verificar que el archivo existe
 if [ ! -f "$ENV_FILE" ]; then
-    echo "❌ Error: No se encontró el archivo $ENV_FILE"
+    echo -e "${RED}❌ Error${NC}: No se encontró el archivo ${GREEN}$ENV_FILE${NC}"
     echo "   Por favor, verifica que el archivo existe y la ruta es correcta"
     exit 1
 fi
@@ -75,8 +82,8 @@ fi
 # Verificar permisos del archivo (debe ser 600 o más restrictivo)
 FILE_PERMS=$(stat -c "%a" "$ENV_FILE" 2>/dev/null || stat -f "%OLp" "$ENV_FILE" 2>/dev/null)
 if [ -n "$FILE_PERMS" ] && [ "$FILE_PERMS" -gt 600 ]; then
-    echo "⚠️  Advertencia: El archivo $ENV_FILE tiene permisos $FILE_PERMS"
-    echo "   Se recomienda usar permisos 600 (chmod 600 $ENV_FILE) para mayor seguridad"
+    echo -e "⚠️  ${YELLOW}Advertencia${NC}: El archivo $ENV_FILE tiene permisos ${RED}$FILE_PERMS${NC}"
+    echo -e "   Se recomienda usar ${YELLOW}permisos 600${NC} (${GREEN}chmod 600 $ENV_FILE${NC}) para mayor seguridad"
     read -p "¿Continuar de todos modos? (s/n): " confirm
     if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
         exit 1
@@ -94,7 +101,8 @@ validate_env_line() {
 }
 
 # Cargar variables de entorno desde el archivo .env especificado
-echo "📄 Cargando variables desde: $ENV_FILE"
+echo ""
+echo -e "📄 Cargando variables desde: ${GREEN}$ENV_FILE${NC}"
 declare -A env_vars
 while IFS= read -r line || [ -n "$line" ]; do
     # Ignorar comentarios y líneas vacías
@@ -117,12 +125,6 @@ done < "$ENV_FILE"
 for var_name in "${!env_vars[@]}"; do
     export "$var_name=${env_vars[$var_name]}"
 done
-
-# Colores para el output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No color
 
 REQUIRED_VARS=(DB1_HOST DB1_PORT DB1_USER DB1_PASS DB1_NAME DB2_HOST DB2_PORT DB2_USER DB2_PASS DB2_NAME)
 missing_vars=()
@@ -150,7 +152,7 @@ echo "Esta operación comparará la estructura de las bases de datos indicadas t
 read -p "¿Continuar? (s/n): " confirmacion
 
 if [[ "$confirmacion" != "s" && "$confirmacion" != "S" ]]; then
-    echo "❌ Operación cancelada por el usuario"
+    echo -e "${RED}❌ Operación cancelada por el usuario${NC}"
     echo ""
     exit 0
 fi
@@ -237,19 +239,20 @@ EOF
     return $result
 }
 
+echo ""
 echo "📋 Obteniendo lista de tablas..."
 
 # Obtener tablas de DB1
 TABLAS_DB1=$(get_tables "$DB1_HOST" "$DB1_PORT" "$DB1_USER" "$DB1_PASS" "$DB1_NAME")
 if [ $? -ne 0 ]; then
-    echo "❌ Error al obtener tablas de $DB1_NAME"
+    echo -e "${RED}❌ Error${NC} al obtener tablas de ${YELLOW}$DB1_NAME${NC}"
     exit 1
 fi
 
 # Obtener tablas de DB2
 TABLAS_DB2=$(get_tables "$DB2_HOST" "$DB2_PORT" "$DB2_USER" "$DB2_PASS" "$DB2_NAME")
 if [ $? -ne 0 ]; then
-    echo "❌ Error al obtener tablas de $DB2_NAME"
+    echo -e "${RED}❌ Error${NC} al obtener tablas de ${YELLOW}$DB2_NAME${NC}"
     exit 1
 fi
 
@@ -297,7 +300,7 @@ for tabla in "${ARR_DB1[@]}"; do
                 rm -f "$ARCHIVO_DB1" "$ARCHIVO_DB2"
                 ((TABLAS_IDENTICAS++))
             else
-                echo "❌ $tabla: Estructura diferente - manteniendo archivos"
+                echo -e "${RED}❌${NC} $tabla: Estructura diferente - manteniendo archivos"
                 ((TABLAS_DIFERENTES++))
             fi
         else
@@ -331,7 +334,7 @@ for tabla in "${ARR_DB2[@]}"; do
 done
 
 echo ""
-echo "📊 RESUMEN DE COMPARACIÓN ESTRUCTURAL:"
+echo -e "${BLUE}📊 RESUMEN DE COMPARACIÓN ESTRUCTURAL:${NC}"
 echo "   Tablas procesadas: $TABLAS_PROCESADAS"
 echo "   Estructuras idénticas (eliminadas): $TABLAS_IDENTICAS"
 echo "   Estructuras diferentes: $TABLAS_DIFERENTES"
@@ -345,15 +348,15 @@ if [ $TABLAS_DIFERENTES -eq 0 ] && [ $TABLAS_SOLO_DB1 -eq 0 ] && [ $TABLAS_SOLO_
     rm -rf "$OUTPUT_DIR"
     echo "✅ Carpeta eliminada. Las estructuras de las bases de datos son iguales."
 else
-    echo "❌ Se encontraron DIFERENCIAS ESTRUCTURALES"
+    echo -e "${RED}❌ Se encontraron DIFERENCIAS ESTRUCTURALES${NC}"
     echo ""
-    echo "📊 Archivos con diferencias guardados en: $OUTPUT_DIR"
+    echo -e "📊 Archivos con diferencias guardados en: ${GREEN}$OUTPUT_DIR${NC}"
     echo ""
-    echo "🔍 Para ver las diferencias de una tabla específica:"
-    echo "   diff $OUTPUT_DIR/${DB1_NAME}_[tabla]_schema.sql $OUTPUT_DIR/${DB2_NAME}_[tabla]_schema.sql"
+    echo -e "🔍 ${BLUE}Para ver las diferencias de una tabla específica:${NC}"
+    echo -e "   ${GREEN}diff $OUTPUT_DIR/${DB1_NAME}_[tabla]_schema.sql $OUTPUT_DIR/${DB2_NAME}_[tabla]_schema.sql${NC}"
     echo ""
-    echo "📋 Para comparación visual de una tabla específica:"
-    echo "   vimdiff $OUTPUT_DIR/${DB1_NAME}_[tabla]_schema.sql $OUTPUT_DIR/${DB2_NAME}_[tabla]_schema.sql"
+    echo -e "📋 ${BLUE}Para comparación visual de una tabla específica:${NC}"
+    echo -e "   ${GREEN}vimdiff $OUTPUT_DIR/${DB1_NAME}_[tabla]_schema.sql $OUTPUT_DIR/${DB2_NAME}_[tabla]_schema.sql${NC}"
     echo ""
     echo "💡 Recomendación: Revisa las diferencias estructurales antes de sincronizar datos."
     
@@ -381,5 +384,5 @@ NOTAS:
 - Los archivos terminados en "${DB2_NAME}_[tabla]_schema.sql" provienen de la BD de producción
 EOF
     
-    echo "📄 Resumen guardado en: $RESUMEN_FILE"
+    echo -e "📄 Resumen guardado en: ${GREEN}$RESUMEN_FILE${NC}"
 fi
